@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace Hoot.Controllers;
@@ -91,36 +92,48 @@ public class ConnectController : Controller
         return Ok(new { access_token = accessToken, token_type = "Bearer", expires_in = 3600 });
     }
 
-
     [HttpPost("token")]
-    [Consumes("application/x-www-form-urlencoded")] // Ensure it accepts form data
+    [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> Token([FromForm] TokenRequest request)
     {
         var client = await _context.Client.FirstOrDefaultAsync(c => c.ClientId == request.ClientId);
         if (client == null)
             return BadRequest(new { error = "invalid_client" });
 
-        //if (!AuthCodeStore.IsValid(request.Code))
-        //    return BadRequest(new { error = "invalid_grant" });
+        //    // if (!AuthCodeStore.IsValid(request.Code))
+        //    //   return BadRequest(new { error = "invalid_grant" });
 
-        //if (client.RequirePkce && !PkceValidator.Validate(request.CodeVerifier, request.CodeChallenge))
-        //    return BadRequest(new { error = "invalid_request" });
-
+        //    //if (client.RequirePkce && !PkceValidator.Validate(request.CodeVerifier, request.CodeChallenge))
+        //    //    return BadRequest(new { error = "invalid_request" });
         AuthCodeStore.Remove(request.Code); // Prevent reuse
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("907A6D3546002CE8744DC03DC455A556"));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
+        var header = new JwtHeader(credentials);
+
+
+
+        header["kid"] = "907A6D3546002CE8744DC03DC455A556"; // ✅ Explicitly set `kid`
 
         var token = new JwtSecurityToken(
             issuer: "https://localhost:7098",
             audience: "api1",
             claims: new List<Claim> { new(JwtRegisteredClaimNames.Sub, request.ClientId) },
             expires: DateTime.UtcNow.AddMinutes(30),
-            signingCredentials: new SigningCredentials(new SymmetricSecurityKey(Encoding.UTF8.GetBytes("your_long_random_secret_key_32_chars_min")), SecurityAlgorithms.HmacSha256)
+            signingCredentials: credentials
         );
-
+        token.Header["kid"] = "907A6D3546002CE8744DC03DC455A556";
         var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
 
-        return Ok(new { access_token = accessToken, token_type = "Bearer", expires_in = 1800 });
-
+        return Ok(new
+        {
+            id_token = accessToken,  // ✅ Now signed using RS256
+            access_token = accessToken,
+            token_type = "Bearer",
+            expires_in = 3600
+        });
     }
+
     [HttpGet("UserInfo")]
     public async Task<IActionResult> GetUserInfo()
     {
@@ -144,19 +157,7 @@ public class ConnectController : Controller
             roles = User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value)
         });
     }
-    //public string Generate256BitKey()
-    //{
-
-
-    //    byte[] secretKey = new byte[32]; // 256-bit key
-    //    using (var rng = RandomNumberGenerator.Create())
-    //    {
-    //        rng.GetBytes(secretKey);
-    //    }
-    //    var key = new SymmetricSecurityKey(secretKey);
-    //    var signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-    //}
+   
     private bool IsValidClient(string clientId, string redirectUri)
     {
         // Example: A dictionary of allowed clients and their redirect URIs

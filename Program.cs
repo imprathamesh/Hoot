@@ -1,8 +1,9 @@
-using Hoot.Components;
+﻿using Hoot.Components;
 using Hoot.Components.Account;
 using Hoot.Data;
 using Hoot.Extensions;
 using Hoot.Filters;
+using Hoot.Helpers;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -19,6 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 if (builder.Environment.IsDevelopment())
 {
     IdentityModelEventSource.ShowPII = true;
+    IdentityModelEventSource.LogCompleteSecurityArtifact = true;
 }
 
 // Add services to the container.
@@ -53,18 +55,23 @@ builder.Services.AddAuthentication(options =>
 
     options.DefaultForbidScheme = IdentityConstants.ApplicationScheme;
 })
-.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme) // Cookie authentication for web apps
+.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+{
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.None;
+}) // Cookie authentication for web apps
 .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options => // JWT authentication for APIs
 {
     options.TokenValidationParameters = new TokenValidationParameters
     {
+        SaveSigninToken = true,
         ValidateIssuer = true,
         ValidateAudience = true,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:SecretKey"]))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("907A6D3546002CE8744DC03DC455A556"))
     };
 })
 .AddIdentityCookies(); // Identity-specific cookie configuration

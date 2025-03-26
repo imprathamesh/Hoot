@@ -7,7 +7,10 @@
 @using Microsoft.AspNetCore.Identity
 @using Hoot.Data
 @using System.Security.Claims
-
+@using Microsoft.IdentityModel.Tokens
+@using System.IdentityModel.Tokens.Jwt
+@using System.Text
+@using Hoot.Helpers
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 @inject ILogger<Login> Logger
@@ -80,12 +83,27 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
+    [Inject]
+    IConfiguration configuration { get; set; }
+
+    string currentUrl = string.Empty;
+
     protected override async Task OnInitializedAsync()
     {
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
             // Clear the existing external cookie to ensure a clean login process
             await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        }
+        currentUrl = NavigationManager.Uri;
+
+        if (HttpContext.User.Identity.IsAuthenticated && currentUrl.Contains("client_id"))
+        {
+            NavigationManager.NavigateTo(GetUri(currentUrl));
+        }
+        else if (HttpContext.User.Identity.IsAuthenticated)
+        {
+            NavigationManager.NavigateTo("/");
         }
     }
 
@@ -127,6 +145,8 @@
     //         errorMessage = "Error: Invalid login attempt.";
     //     }
     // }
+    [Inject]
+    IHttpContextAccessor HttpContextAccessor { get; set; }
 
     public async Task LoginUser()
     {
@@ -150,7 +170,9 @@
         {
             new Claim(ClaimTypes.Name, user.UserName),
             new Claim(ClaimTypes.Email, user.Email),
-            new Claim("sub", user.Id) // OpenID Connect requires 'sub' claim for user identification
+             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim("sub", user.Id), // OpenID Connect requires 'sub' claim for user identification
+            new Claim("role", "Admin") // Example role claim
         };
 
             var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
@@ -161,14 +183,16 @@
 
             await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), authProperties);
 
-            // Check if there is a return URL with OIDC parameters
-            var url = NavigationManager.Uri;
+            //Generate Token
+            GenerateToken(claims);
 
-            if (url.Contains("client_id"))
+            // Check if there is a return URL with OIDC parameters
+
+            if (currentUrl.Contains("client_id"))
             {
-                Logger.LogInformation("Redirecting to client app: {RedirectUrl}", url);
-                
-                NavigationManager.NavigateTo(GetUri(url));
+                Logger.LogInformation("Redirecting to client app: {RedirectUrl}", currentUrl);
+
+                NavigationManager.NavigateTo(GetUri(currentUrl));
             }
 
             RedirectManager.RedirectTo(ReturnUrl ?? "/");
@@ -209,20 +233,57 @@
 
     string GetUri(string url)
     {
-        int redirectUriIndex = url.IndexOf("redirect_uri=", StringComparison.OrdinalIgnoreCase);
-
-        if (redirectUriIndex != -1)
+        if (url.Contains("redirect_uri="))
         {
-            // Move the index to the start of the redirect_uri value (after "redirect_uri=")
-            redirectUriIndex += "redirect_uri=".Length;
+            int redirectUriIndex = url.IndexOf("redirect_uri=", StringComparison.OrdinalIgnoreCase);
 
-            // Extract everything after "redirect_uri="
-            string result = url.Substring(redirectUriIndex);
+            if (redirectUriIndex != -1)
+            {
+                // Move the index to the start of the redirect_uri value (after "redirect_uri=")
+                redirectUriIndex += "redirect_uri=".Length;
 
-            // Decode the URL-encoded parts
-            return result = System.Web.HttpUtility.UrlDecode(result);
+                // Extract everything after "redirect_uri="
+                string result = url.Substring(redirectUriIndex);
 
+                // Decode the URL-encoded parts
+                return result = System.Web.HttpUtility.UrlDecode(result);
+
+            }
         }
         return null;
+    }
+    string GenerateToken(List<Claim> claims)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("907A6D3546002CE8744DC03DC455A556"));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
+
+        var header = new JwtHeader(creds);
+
+        header["kid"] = "907A6D3546002CE8744DC03DC455A556"; // ✅ Explicitly set `kid`
+
+        var token = new JwtSecurityToken(
+            issuer: "https://localhost:7098",
+            //audience: "https://localhost:7067",
+            audience: "api1",
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(60),
+            signingCredentials: creds
+        );
+        token.Header["kid"] = "907A6D3546002CE8744DC03DC455A556";
+
+        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+        // Store the JWT in an HttpOnly Cookie
+        var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,  // Set to true if using HTTPS
+                SameSite = SameSiteMode.None  // Required for cross-origin authentication
+            };
+
+        HttpContextAccessor.HttpContext.Response.Cookies.Append("AuthToken", tokenString, cookieOptions);
+
+        return "Token Generated";
+
     }
 }

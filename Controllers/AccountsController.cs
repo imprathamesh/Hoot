@@ -20,6 +20,16 @@ public class AccountsController : Controller
         _signInManager = signInManager;
         _userManager = userManager;
     }
+    [HttpGet("token")]
+    public IActionResult GetToken()
+    {
+        if (Request.Cookies.TryGetValue("AuthToken", out var token))
+        {
+            return Ok(new { Token = token });
+        }
+
+        return Unauthorized(new { Message = "No token found" });
+    }
 
     [HttpPost("Register")]
     public async Task<IActionResult> Register(UserViewModel Input, string returnUrl = null)
