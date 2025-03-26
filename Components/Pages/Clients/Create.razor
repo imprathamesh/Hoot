@@ -1,0 +1,46 @@
+﻿@page "/Clients/Create"
+@using Hoot.Models
+@using Hoot.Services
+@inject IClientService _clientService
+
+<h3>Clients</h3>
+
+<EditForm Model="client" OnValidSubmit="Submit">
+    <DataAnnotationsValidator />
+    <div class="row">
+        <div class="col-4 col-xs-12 d-flex flex-column gap-3">
+            <div class="form-floating">
+                <InputText @bind-Value="client.ClientName" id="client.ClientName" class="form-control" autocomplete="Client Name" aria-required="true" placeholder="Client Name" />
+                <label for="client.ClientName" class="form-label">Client Name</label>
+                <ValidationMessage For="() => client.ClientName" class="text-danger" />
+            </div>
+            <div class="form-floating">
+                <InputText @bind-Value="client.ClientId" id="client.ClientId" class="form-control" aria-required="true" placeholder="Client Id" />
+                <label for="client.ClientName" class="form-label">Client Id</label>
+                <ValidationMessage For="() => client.ClientId" class="text-danger" />
+            </div>
+            <div class="form-floating">
+                <InputText @bind-Value="client.ClientUri" id="client.ClientUri" class="form-control" aria-required="true" placeholder="Client Uri" />
+                <label for="client.ClientName" class="form-label">Client Uri</label>
+                <ValidationMessage For="() => client.ClientUri" class="text-danger" />
+            </div>
+            <div class="form-floating">
+                <InputText @bind-Value="client.Description" id="client.Description" class="form-control" aria-required="true" placeholder="Description" />
+                <label for="client.ClientName" class="form-label">Description</label>
+                <ValidationMessage For="() => client.Description" class="text-danger" />
+            </div>
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </div>
+</EditForm>
+
+@code {
+    Client client = new();
+
+    async Task Submit()
+    {
+        await _clientService.Post(client);
+
+        string showMessage = "Client Created Successfully";
+    }
+}

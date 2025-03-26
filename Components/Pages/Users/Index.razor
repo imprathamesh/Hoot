@@ -1,0 +1,46 @@
+﻿@page "/Users"
+@using Hoot.Helpers
+@using Hoot.Models
+@using Hoot.Services
+@using Hoot.Services.Users
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = Roles.Admin)]
+
+@inject IUserService _userService
+
+<h3>Users</h3>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Created On</th>
+            <th>Is Email Verified</th>
+        </tr>
+    </thead>
+    <tbody>
+        @if (users is not null)
+        {
+            foreach (var item in users)
+            {
+                <tr>
+                    <td>@item.Name</td>
+                    <td>@item.Email</td>
+                    <td>@item.CreatedOn</td>
+                    <td>@item.EmailConfirmed</td>
+                </tr>
+            }
+        }
+    </tbody>
+</table>
+
+@code {
+    IEnumerable<UserViewModel>? users;
+
+    protected override async Task OnInitializedAsync()
+    {
+        users = await _userService.Get();
+    }
+
+}
