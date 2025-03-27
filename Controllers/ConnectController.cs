@@ -100,14 +100,28 @@ public class ConnectController : Controller
     public async Task<IActionResult> Token([FromForm] TokenRequest request)
     {
         var client = await _context.Client.FirstOrDefaultAsync(c => c.ClientId == request.ClientId);
+
         if (client == null)
             return BadRequest(new { error = "invalid_client" });
+
+        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userId))
+        {
+            return Unauthorized(new { error = "Invalid token or user not found" });
+        }
+
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null)
+        {
+            return NotFound(new { error = "User not found" });
+        }
 
         //    // if (!AuthCodeStore.IsValid(request.Code))
         //    //   return BadRequest(new { error = "invalid_grant" });
 
         //    //if (client.RequirePkce && !PkceValidator.Validate(request.CodeVerifier, request.CodeChallenge))
         //    //    return BadRequest(new { error = "invalid_request" });
+
         AuthCodeStore.Remove(request.Code); // Prevent reuse
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("YourSuperLongSecureSecretKeyHere"));
@@ -123,7 +137,8 @@ public class ConnectController : Controller
                 new(JwtRegisteredClaimNames.Sub, request.ClientId),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new("Role", Roles.Tenant),
-                //new(ClaimTypes.Name,_httpContextAccessor.HttpContext.User.)
+                new(ClaimTypes.Name,user.UserName),
+                new(ClaimTypes.Email,user.Email)
             },
             expires: DateTime.UtcNow.AddMinutes(30),
             signingCredentials: credentials
