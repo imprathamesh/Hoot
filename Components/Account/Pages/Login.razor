@@ -11,6 +11,8 @@
 @using System.IdentityModel.Tokens.Jwt
 @using System.Text
 @using Hoot.Helpers
+@using System.Text.Json
+@using System.Text.RegularExpressions
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 @inject ILogger<Login> Logger
@@ -190,9 +192,10 @@
 
             if (currentUrl.Contains("client_id"))
             {
-                Logger.LogInformation("Redirecting to client app: {RedirectUrl}", currentUrl);
-
+                //string c = Regex.Replace(currentUrl, "&", "[Replace]");
                 NavigationManager.NavigateTo(GetUri(currentUrl));
+
+                Logger.LogInformation("Redirecting to client app: {RedirectUrl}", GetUri(currentUrl));
             }
 
             RedirectManager.RedirectTo(ReturnUrl ?? "/");
@@ -246,20 +249,29 @@
                 string result = url.Substring(redirectUriIndex);
 
                 // Decode the URL-encoded parts
-                return result = System.Web.HttpUtility.UrlDecode(result);
+                result = System.Web.HttpUtility.UrlDecode(result);
 
+                //change first & to ?
+                int index = result.IndexOf("&");
+
+                if (index != -1) // Check if & exists in the string
+                {
+                    string output = result.Substring(0, index) + "?" + result.Substring(index + 1);
+                    result = output;
+                }
+                return result;
             }
         }
         return null;
     }
     string GenerateToken(List<Claim> claims)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("907A6D3546002CE8744DC03DC455A556"));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("YourSuperLongSecureSecretKeyHere"));
+        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var header = new JwtHeader(creds);
 
-        header["kid"] = "907A6D3546002CE8744DC03DC455A556"; // ✅ Explicitly set `kid`
+        header["kid"] = "YourSuperLongSecureSecretKeyHere"; // ✅ Explicitly set `kid`
 
         var token = new JwtSecurityToken(
             issuer: "https://localhost:7098",
@@ -269,9 +281,11 @@
             expires: DateTime.UtcNow.AddMinutes(60),
             signingCredentials: creds
         );
-        token.Header["kid"] = "907A6D3546002CE8744DC03DC455A556";
+        token.Header["kid"] = "YourSuperLongSecureSecretKeyHere";
 
-        var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+        var result = new JwtSecurityTokenHandler().WriteToken(token);
+
+        Logger.LogInformation(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
 
         // Store the JWT in an HttpOnly Cookie
         var cookieOptions = new CookieOptions
@@ -281,7 +295,7 @@
                 SameSite = SameSiteMode.None  // Required for cross-origin authentication
             };
 
-        HttpContextAccessor.HttpContext.Response.Cookies.Append("AuthToken", tokenString, cookieOptions);
+        HttpContextAccessor.HttpContext.Response.Cookies.Append("AuthToken", result, cookieOptions);
 
         return "Token Generated";
 

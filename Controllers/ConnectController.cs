@@ -1,5 +1,6 @@
 ﻿using Hoot.Data;
 using Hoot.Extensions;
+using Hoot.Helpers;
 using Hoot.Models;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Identity;
@@ -8,8 +9,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 
 namespace Hoot.Controllers;
 
@@ -20,11 +21,13 @@ public class ConnectController : Controller
     private readonly ApplicationDbContext _context;
     private UserManager<ApplicationUser> _userManager;
     readonly ILogger<ConnectController> _logger;
-    public ConnectController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, ILogger<ConnectController> logger)
+    readonly IHttpContextAccessor _httpContextAccessor;
+    public ConnectController(ApplicationDbContext context, UserManager<ApplicationUser> userManager, ILogger<ConnectController> logger, IHttpContextAccessor httpContextAccessor)
     {
         _context = context;
         _userManager = userManager;
         _logger = logger;
+        _httpContextAccessor = httpContextAccessor;
     }
 
     [HttpGet("authorize")]
@@ -107,31 +110,32 @@ public class ConnectController : Controller
         //    //    return BadRequest(new { error = "invalid_request" });
         AuthCodeStore.Remove(request.Code); // Prevent reuse
 
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("907A6D3546002CE8744DC03DC455A556"));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("YourSuperLongSecureSecretKeyHere"));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var header = new JwtHeader(credentials);
 
-
-
-        header["kid"] = "907A6D3546002CE8744DC03DC455A556"; // ✅ Explicitly set `kid`
+        header["kid"] = "YourSuperLongSecureSecretKeyHere"; // ✅ Explicitly set `kid`
 
         var token = new JwtSecurityToken(
             issuer: "https://localhost:7098",
             audience: "api1",
-            claims: new List<Claim> { new(JwtRegisteredClaimNames.Sub, request.ClientId) },
+            claims: new List<Claim> {
+                new(JwtRegisteredClaimNames.Sub, request.ClientId),
+                new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+                new("Role", Roles.Tenant),
+                //new(ClaimTypes.Name,_httpContextAccessor.HttpContext.User.)
+            },
             expires: DateTime.UtcNow.AddMinutes(30),
             signingCredentials: credentials
         );
-        token.Header["kid"] = "907A6D3546002CE8744DC03DC455A556";
+        token.Header["kid"] = "YourSuperLongSecureSecretKeyHere";
         var accessToken = new JwtSecurityTokenHandler().WriteToken(token);
 
-        return Ok(new
-        {
-            id_token = accessToken,  // ✅ Now signed using RS256
-            access_token = accessToken,
-            token_type = "Bearer",
-            expires_in = 3600
-        });
+        var result = new TokenViewModel(accessToken, accessToken, "Bearer", 3600);
+
+        _logger.LogInformation(JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+
+        return Ok(result);
     }
 
     [HttpGet("UserInfo")]
@@ -157,7 +161,7 @@ public class ConnectController : Controller
             roles = User.Claims.Where(c => c.Type == ClaimTypes.Role).Select(c => c.Value)
         });
     }
-   
+
     private bool IsValidClient(string clientId, string redirectUri)
     {
         // Example: A dictionary of allowed clients and their redirect URIs
@@ -212,3 +216,5 @@ public class ConnectController : Controller
     }
 
 }
+
+public record TokenViewModel(string Id_token, string Access_token, string Token_type, int Expires_in);

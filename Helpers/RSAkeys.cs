@@ -9,6 +9,6 @@ public class RSAkeys
 
     public SymmetricSecurityKey GenerateKeyId()
     {
-        return new SymmetricSecurityKey(Encoding.UTF8.GetBytes("907A6D3546002CE8744DC03DC455A556"));
+        return new SymmetricSecurityKey(Encoding.UTF8.GetBytes("YourSuperLongSecureSecretKeyHere"));
     }
 }

@@ -1,7 +1,6 @@
 ﻿using Hoot.Data;
 using Hoot.Models;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Internal;
 
 namespace Hoot.Services;
 

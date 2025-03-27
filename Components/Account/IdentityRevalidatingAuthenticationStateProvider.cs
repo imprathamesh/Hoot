@@ -1,9 +1,9 @@
-using System.Security.Claims;
+using Hoot.Data;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
-using Hoot.Data;
+using System.Security.Claims;
 
 namespace Hoot.Components.Account;
 

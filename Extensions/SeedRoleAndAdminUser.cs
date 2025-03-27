@@ -1,5 +1,4 @@
 ﻿using Hoot.Data;
-using Hoot.Helpers;
 using Microsoft.AspNetCore.Identity;
 
 namespace Hoot.Extensions

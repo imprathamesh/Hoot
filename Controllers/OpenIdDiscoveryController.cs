@@ -2,10 +2,8 @@
 using Hoot.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.CodeAnalysis;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
-using System.Text;
 
 namespace Hoot.Controllers;
 
@@ -49,7 +47,7 @@ public class OpenIdDiscoveryController : ControllerBase
         var rsaKey = RSA.Create(2048);
         var key = new RsaSecurityKey(rsaKey)
         {
-            KeyId = "907A6D3546002CE8744DC03DC455A556"
+            KeyId = "YourSuperLongSecureSecretKeyHere"
         };
 
         var parameters = rsaKey.ExportParameters(false);
@@ -61,7 +59,7 @@ public class OpenIdDiscoveryController : ControllerBase
             Kid = key.KeyId,
             E = Base64UrlEncoder.Encode(parameters.Exponent),
             N = Base64UrlEncoder.Encode(parameters.Modulus),
-            Alg = SecurityAlgorithms.RsaSha256
+            Alg = SecurityAlgorithms.HmacSha256
         };
 
         var jwks = new

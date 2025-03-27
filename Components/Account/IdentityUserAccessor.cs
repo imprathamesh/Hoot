@@ -1,5 +1,5 @@
-using Microsoft.AspNetCore.Identity;
 using Hoot.Data;
+using Microsoft.AspNetCore.Identity;
 
 namespace Hoot.Components.Account;
 
