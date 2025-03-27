@@ -27,6 +27,7 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 // .AddAuthenticationStateSerialization(options => options.SerializeAllClaims = true); 
 
+//builder.Services.AddAntiforgery();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();

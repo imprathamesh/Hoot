@@ -86,7 +86,7 @@
     private string? ReturnUrl { get; set; }
 
     [Inject]
-    IConfiguration configuration { get; set; }
+    IHttpContextAccessor HttpContextAccessor { get; set; }
 
     string currentUrl = string.Empty;
 
@@ -147,8 +147,7 @@
     //         errorMessage = "Error: Invalid login attempt.";
     //     }
     // }
-    [Inject]
-    IHttpContextAccessor HttpContextAccessor { get; set; }
+
 
     public async Task LoginUser()
     {
@@ -262,7 +261,7 @@
                 return result;
             }
         }
-        return null;
+        return string.Empty;
     }
     string GenerateToken(List<Claim> claims)
     {

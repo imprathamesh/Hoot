@@ -104,17 +104,17 @@ public class ConnectController : Controller
         if (client == null)
             return BadRequest(new { error = "invalid_client" });
 
-        var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrEmpty(userId))
-        {
-            return Unauthorized(new { error = "Invalid token or user not found" });
-        }
+        //var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        //if (string.IsNullOrEmpty(userId))
+        //{
+        //    return Unauthorized(new { error = "Invalid token or user not found" });
+        //}
 
-        var user = await _userManager.FindByIdAsync(userId);
-        if (user == null)
-        {
-            return NotFound(new { error = "User not found" });
-        }
+        //var user = await _userManager.FindByIdAsync(userId);
+        //if (user == null)
+        //{
+        //    return NotFound(new { error = "User not found" });
+        //}
 
         //    // if (!AuthCodeStore.IsValid(request.Code))
         //    //   return BadRequest(new { error = "invalid_grant" });
@@ -137,8 +137,8 @@ public class ConnectController : Controller
                 new(JwtRegisteredClaimNames.Sub, request.ClientId),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new("Role", Roles.Tenant),
-                new(ClaimTypes.Name,user.UserName),
-                new(ClaimTypes.Email,user.Email)
+                //new(ClaimTypes.Name,user.UserName),
+                //new(ClaimTypes.Email,user.Email)
             },
             expires: DateTime.UtcNow.AddMinutes(30),
             signingCredentials: credentials
