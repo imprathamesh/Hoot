@@ -1,9 +1,10 @@
 ﻿@page "/Users"
 @using Hoot.Helpers
-@using Hoot.Models
 @using Hoot.Services
 @using Hoot.Services.Users
+@using Hoot.ViewModels
 @using Microsoft.AspNetCore.Authorization
+@using System.Security.Claims
 @attribute [Authorize(Roles = Roles.Admin)]
 
 @inject IUserService _userService
@@ -34,13 +35,27 @@
         }
     </tbody>
 </table>
+@if (claims is not null)
+{
+    @foreach (var item in claims)
+    {
+        @item.Key
+        @item.Value
+    }
 
+}
 @code {
     IEnumerable<UserViewModel>? users;
+
+    Dictionary<string, string> claims = new();
 
     protected override async Task OnInitializedAsync()
     {
         users = await _userService.Get();
+
+        claims = _userService.GetClaims();
+
+
     }
 
 }

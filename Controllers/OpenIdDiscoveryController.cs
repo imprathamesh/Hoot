@@ -1,6 +1,4 @@
-﻿
-using Hoot.Helpers;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.Security.Cryptography;
@@ -22,7 +20,7 @@ public class OpenIdDiscoveryController : ControllerBase
     [HttpGet("openid-configuration")]
     public IActionResult GetDiscoveryDocument()
     {
-        var authorityUrl = "https://localhost:7098"; //_configuration["AuthServer:Authority"]; // Example: https://localhost:7098
+        var authorityUrl = _configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("Issuer not found");
 
         var discoveryData = new Dictionary<string, object>
     {
@@ -42,12 +40,10 @@ public class OpenIdDiscoveryController : ControllerBase
     [HttpGet("jwks")]
     public IActionResult GetJwks()
     {
-        var k = new RSAkeys();
-
         var rsaKey = RSA.Create(2048);
         var key = new RsaSecurityKey(rsaKey)
         {
-            KeyId = "YourSuperLongSecureSecretKeyHere"
+            KeyId = _configuration["Jwt:SecretKey"]
         };
 
         var parameters = rsaKey.ExportParameters(false);

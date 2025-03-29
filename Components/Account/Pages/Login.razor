@@ -1,24 +1,26 @@
 ﻿@page "/Account/Login"
 
 @using System.ComponentModel.DataAnnotations
+@using System.IdentityModel.Tokens.Jwt
+@using System.Security.Claims
+@using System.Text
+@using System.Text.Json
+@using System.Text.RegularExpressions
+@using Hoot.Data
+@using Hoot.Extensions
+@using Hoot.Helpers
+@using Hoot.Helpers.Store
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.Cookies
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Identity
-@using Hoot.Data
-@using System.Security.Claims
 @using Microsoft.IdentityModel.Tokens
-@using System.IdentityModel.Tokens.Jwt
-@using System.Text
-@using Hoot.Helpers
-@using System.Text.Json
-@using System.Text.RegularExpressions
 @inject SignInManager<ApplicationUser> SignInManager
 @inject UserManager<ApplicationUser> UserManager
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
-
+@inject Blazored.SessionStorage.ISessionStorageService _session
 <PageTitle>Log in</PageTitle>
 
 <h1>Log in</h1>
@@ -87,6 +89,9 @@
 
     [Inject]
     IHttpContextAccessor HttpContextAccessor { get; set; }
+
+    [Inject]
+    private IConfiguration _configuration { get; set; }
 
     string currentUrl = string.Empty;
 
@@ -188,13 +193,23 @@
             GenerateToken(claims);
 
             // Check if there is a return URL with OIDC parameters
+            var cookieOptions = new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,  // Set to true if using HTTPS
+                    SameSite = SameSiteMode.None  // Required for cross-origin authentication
+                };
+            HttpContextAccessor.HttpContext.Response.Cookies.Append("Email", Input.Email, cookieOptions);
+
+            string authCode = Guid.NewGuid().ToString("N");
+            AuthCodeStore.Store(authCode, user.Id);
 
             if (currentUrl.Contains("client_id"))
             {
+                Logger.LogWarning($"Redirecting to client app: with code={authCode}", GetUri(currentUrl));
                 //string c = Regex.Replace(currentUrl, "&", "[Replace]");
-                NavigationManager.NavigateTo(GetUri(currentUrl));
+                NavigationManager.NavigateTo($"{GetUri(currentUrl)}&code={authCode}");
 
-                Logger.LogInformation("Redirecting to client app: {RedirectUrl}", GetUri(currentUrl));
             }
 
             RedirectManager.RedirectTo(ReturnUrl ?? "/");
@@ -217,7 +232,12 @@
             //ModelState.AddModelError(string.Empty, "Invalid login attempt.");
         }
     }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await _session.SetItemAsync("email", Input.Email);
 
+        //var name = await sessionStorage.GetItemAsync<string>("name");
+    }
 
     private sealed class InputModel
     {
@@ -265,22 +285,18 @@
     }
     string GenerateToken(List<Claim> claims)
     {
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("YourSuperLongSecureSecretKeyHere"));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:SecretKey"]));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var header = new JwtHeader(creds);
-
-        header["kid"] = "YourSuperLongSecureSecretKeyHere"; // ✅ Explicitly set `kid`
-
         var token = new JwtSecurityToken(
-            issuer: "https://localhost:7098",
-            //audience: "https://localhost:7067",
-            audience: "api1",
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(60),
-            signingCredentials: creds
-        );
-        token.Header["kid"] = "YourSuperLongSecureSecretKeyHere";
+     issuer: "https://localhost:7098",
+     //audience: "https://localhost:7067",
+     audience: "api1",
+     claims: claims,
+     expires: DateTime.UtcNow.AddMinutes(60),
+     signingCredentials: creds
+                    );
+        token.Header["kid"] = _configuration["Jwt:SecretKey"];
 
         var result = new JwtSecurityTokenHandler().WriteToken(token);
 
